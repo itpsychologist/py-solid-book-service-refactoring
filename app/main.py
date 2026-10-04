@@ -1,5 +1,5 @@
 import json
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Mapping, TypeVar
@@ -14,7 +14,8 @@ class Book:
 # ===================== Відображення =====================
 class Displayer(ABC):
     @abstractmethod
-    def display(self, book: Book) -> None: ...
+    def display(self, book: Book) -> None:
+        ...
 
 
 class ConsoleDisplayer(Displayer):
@@ -30,12 +31,13 @@ class ReverseDisplayer(Displayer):
 # ===================== Друк =====================
 class Printer(ABC):
     @abstractmethod
-    def print_book(self, book: Book) -> None: ...
+    def print_book(self, book: Book) -> None:
+        ...
 
 
 class HeaderPrinter(Printer):
 
-    def __init__(self, header_template: str, displayer: Displayer):
+    def __init__(self, header_template: str, displayer: Displayer) -> None:
         self._header_template = header_template
         self._displayer = displayer
 
@@ -47,7 +49,8 @@ class HeaderPrinter(Printer):
 # ===================== Серіалізація =====================
 class Serializer(ABC):
     @abstractmethod
-    def serialize(self, book: Book) -> str: ...
+    def serialize(self, book: Book) -> str:
+        ...
 
 
 class JsonSerializer(Serializer):
@@ -57,10 +60,10 @@ class JsonSerializer(Serializer):
 
 class XmlSerializer(Serializer):
     def serialize(self, book: Book) -> str:
-        root = ET.Element("book")
-        ET.SubElement(root, "title").text = book.title
-        ET.SubElement(root, "content").text = book.content
-        return ET.tostring(root, encoding="unicode")
+        root = ElementTree.Element("book")
+        ElementTree.SubElement(root, "title").text = book.title
+        ElementTree.SubElement(root, "content").text = book.content
+        return ElementTree.tostring(root, encoding="unicode")
 
 
 # ===================== Вибір стратегії =====================
@@ -77,11 +80,12 @@ def get_strategy(registry: Mapping[str, T], key: str, kind: str) -> T:
 # ===================== Команди =====================
 class Command(ABC):
     @abstractmethod
-    def execute(self, book: Book, method_type: str) -> str | None: ...
+    def execute(self, book: Book, method_type: str) -> str | None:
+        ...
 
 
 class DisplayCommand(Command):
-    def __init__(self, displayers: Mapping[str, Displayer]):
+    def __init__(self, displayers: Mapping[str, Displayer]) -> None:
         self._displayers = displayers
 
     def execute(self, book: Book, method_type: str) -> None:
@@ -89,7 +93,7 @@ class DisplayCommand(Command):
 
 
 class PrintCommand(Command):
-    def __init__(self, printers: Mapping[str, Printer]):
+    def __init__(self, printers: Mapping[str, Printer]) -> None:
         self._printers = printers
 
     def execute(self, book: Book, method_type: str) -> None:
@@ -97,11 +101,14 @@ class PrintCommand(Command):
 
 
 class SerializeCommand(Command):
-    def __init__(self, serializers: Mapping[str, Serializer]):
+    def __init__(self, serializers: Mapping[str, Serializer]) -> None:
         self._serializers = serializers
 
     def execute(self, book: Book, method_type: str) -> str:
-        return get_strategy(self._serializers, method_type, "serialize").serialize(book)
+        return get_strategy(
+            self._serializers,
+            method_type,
+            "serialize").serialize(book)
 
 
 # ===================== Збірка (composition root) =====================
@@ -111,8 +118,12 @@ def build_default_commands() -> dict[str, Command]:
         "reverse": ReverseDisplayer(),
     }
     printers: dict[str, Printer] = {
-        "console": HeaderPrinter("Printing the book: {title}...", displayers["console"]),
-        "reverse": HeaderPrinter("Printing the book in reverse: {title}...", displayers["reverse"]),
+        "console": HeaderPrinter(
+            "Printing the book: {title}...", displayers["console"]
+        ),
+        "reverse": HeaderPrinter(
+            "Printing the book in reverse: {title}...", displayers["reverse"]
+        ),
     }
     serializers: dict[str, Serializer] = {
         "json": JsonSerializer(),
@@ -126,9 +137,9 @@ def build_default_commands() -> dict[str, Command]:
 
 
 def main(
-        book: Book,
-        commands: list[tuple[str, str]],
-        handlers: Mapping[str, Command] | None = None,
+    book: Book,
+    commands: list[tuple[str, str]],
+    handlers: Mapping[str, Command] | None = None,
 ) -> None | str:
     handlers = handlers if handlers is not None else build_default_commands()
     for cmd, method_type in commands:
