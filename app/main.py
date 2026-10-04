@@ -1,117 +1,17 @@
-import json
-from xml.etree import ElementTree
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Mapping, TypeVar
+from typing import Mapping
+
+from app.Commands import (
+    Command,
+    DisplayCommand,
+    PrintCommand,
+    SerializeCommand,
+)
+from app.Displayers import ConsoleDisplayer, Displayer, ReverseDisplayer
+from app.Models import Book
+from app.Printers import HeaderPrinter, Printer
+from app.Serializers import JsonSerializer, Serializer, XmlSerializer
 
 
-@dataclass
-class Book:
-    title: str
-    content: str
-
-
-# ===================== Відображення =====================
-class Displayer(ABC):
-    @abstractmethod
-    def display(self, book: Book) -> None:
-        ...
-
-
-class ConsoleDisplayer(Displayer):
-    def display(self, book: Book) -> None:
-        print(book.content)
-
-
-class ReverseDisplayer(Displayer):
-    def display(self, book: Book) -> None:
-        print(book.content[::-1])
-
-
-# ===================== Друк =====================
-class Printer(ABC):
-    @abstractmethod
-    def print_book(self, book: Book) -> None:
-        ...
-
-
-class HeaderPrinter(Printer):
-
-    def __init__(self, header_template: str, displayer: Displayer) -> None:
-        self._header_template = header_template
-        self._displayer = displayer
-
-    def print_book(self, book: Book) -> None:
-        print(self._header_template.format(title=book.title))
-        self._displayer.display(book)
-
-
-# ===================== Серіалізація =====================
-class Serializer(ABC):
-    @abstractmethod
-    def serialize(self, book: Book) -> str:
-        ...
-
-
-class JsonSerializer(Serializer):
-    def serialize(self, book: Book) -> str:
-        return json.dumps({"title": book.title, "content": book.content})
-
-
-class XmlSerializer(Serializer):
-    def serialize(self, book: Book) -> str:
-        root = ElementTree.Element("book")
-        ElementTree.SubElement(root, "title").text = book.title
-        ElementTree.SubElement(root, "content").text = book.content
-        return ElementTree.tostring(root, encoding="unicode")
-
-
-# ===================== Вибір стратегії =====================
-T = TypeVar("T")
-
-
-def get_strategy(registry: Mapping[str, T], key: str, kind: str) -> T:
-    try:
-        return registry[key]
-    except KeyError:
-        raise ValueError(f"Unknown {kind} type: {key}") from None
-
-
-# ===================== Команди =====================
-class Command(ABC):
-    @abstractmethod
-    def execute(self, book: Book, method_type: str) -> str | None:
-        ...
-
-
-class DisplayCommand(Command):
-    def __init__(self, displayers: Mapping[str, Displayer]) -> None:
-        self._displayers = displayers
-
-    def execute(self, book: Book, method_type: str) -> None:
-        get_strategy(self._displayers, method_type, "display").display(book)
-
-
-class PrintCommand(Command):
-    def __init__(self, printers: Mapping[str, Printer]) -> None:
-        self._printers = printers
-
-    def execute(self, book: Book, method_type: str) -> None:
-        get_strategy(self._printers, method_type, "print").print_book(book)
-
-
-class SerializeCommand(Command):
-    def __init__(self, serializers: Mapping[str, Serializer]) -> None:
-        self._serializers = serializers
-
-    def execute(self, book: Book, method_type: str) -> str:
-        return get_strategy(
-            self._serializers,
-            method_type,
-            "serialize").serialize(book)
-
-
-# ===================== Збірка (composition root) =====================
 def build_default_commands() -> dict[str, Command]:
     displayers: dict[str, Displayer] = {
         "console": ConsoleDisplayer(),
@@ -137,15 +37,15 @@ def build_default_commands() -> dict[str, Command]:
 
 
 def main(
-    book: Book,
-    commands: list[tuple[str, str]],
-    handlers: Mapping[str, Command] | None = None,
+        book: Book,
+        commands: list[tuple[str, str]],
+        handlers: Mapping[str, Command] | None = None,
 ) -> None | str:
     handlers = handlers if handlers is not None else build_default_commands()
     for cmd, method_type in commands:
         handler = handlers.get(cmd)
         if handler is None:
-            continue  # як і в оригіналі: невідомі команди ігноруються
+            continue  # невідомі команди ігноруються
         result = handler.execute(book, method_type)
         if result is not None:
             return result
